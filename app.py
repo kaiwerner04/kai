@@ -36,46 +36,39 @@ def next_step():
         data = request.get_json()
         user_response = data['message']
         step = session.get('step', 1)
+
+        # Ensure session history is initialized
+        if 'history' not in session:
+            session['history'] = []
+
         session['history'].append({"role": "user", "content": user_response})
+        logging.debug(f"Step: {step}, User Response: {user_response}")
 
         if step == 1:
             session['symbol'] = user_response.upper()
             session['current_price'] = get_current_stock_price(session['symbol'])
-            if session['current_price'] is None:
-                response = "Sorry, I couldn't find the stock symbol. Please enter a valid stock symbol."
-                session['history'].pop()  # Remove the invalid entry from history
-            else:
-                session['step'] = 2
-                response = "Great! How many shares do you own?"
+            session['step'] = 2
+            response = "Great! How many shares do you own?"
         elif step == 2:
-            try:
-                session['num_shares'] = int(user_response)
-                session['step'] = 3
-                response = "Understood. What is the maximum amount you are willing to lose (in dollars)?"
-            except ValueError:
-                response = "Please enter a valid number of shares."
+            session['num_shares'] = int(user_response)
+            session['step'] = 3
+            response = "Understood. What is the maximum amount you are willing to lose (in dollars)?"
         elif step == 3:
-            try:
-                session['loss_aversion'] = float(user_response)
-                session['step'] = 4
-                response = "Got it. For how many weeks would you like this hedge to be effective?"
-            except ValueError:
-                response = "Please enter a valid amount in dollars."
+            session['loss_aversion'] = float(user_response)
+            session['step'] = 4
+            response = "Got it. For how many weeks would you like this hedge to be effective?"
         elif step == 4:
-            try:
-                session['hedge_duration'] = int(user_response)
-                symbol = session['symbol']
-                target_date = (datetime.now() + timedelta(weeks=session['hedge_duration'])).strftime("%Y-%m-%d")
-                expiration_dates = get_option_chain_dates_within_range(symbol, target_date, weeks_range=2)
-                session['expiration_dates'] = expiration_dates
-                session['step'] = 5
-                response = {
-                    "message": "Here are some expiration dates close to your desired hedge duration. Please choose one of the following dates:",
-                    "dates": expiration_dates
-                }
-                return jsonify(response)
-            except ValueError:
-                response = "Please enter a valid number of weeks."
+            session['hedge_duration'] = int(user_response)
+            symbol = session['symbol']
+            target_date = (datetime.now() + timedelta(weeks=session['hedge_duration'])).strftime("%Y-%m-%d")
+            expiration_dates = get_option_chain_dates_within_range(symbol, target_date, weeks_range=2)
+            session['expiration_dates'] = expiration_dates
+            session['step'] = 5
+            response = {
+                "message": "Here are some expiration dates close to your desired hedge duration. Please choose one of the following dates:",
+                "dates": expiration_dates
+            }
+            return jsonify(response)
         elif step == 5:
             session['expiration_date'] = user_response
             session['step'] = 6
@@ -102,23 +95,24 @@ def next_step():
         elif step == 7:
             try:
                 session['strike_price'] = float(user_response)
-                session['option_type'] = 'put' if session['sentiment'] == 'bearish' else 'call'
-
-                symbol = session['symbol']
-                expiration_date = session['expiration_date']
-                strike_price = session['strike_price']
-                call_premium, put_premium = get_option_premium(symbol, expiration_date, strike_price)
-                session['call_premium'] = call_premium
-                session['put_premium'] = put_premium
-                total_cost = (call_premium or 0) * session['num_shares'] + (put_premium or 0) * session['num_shares']
-                additional_prompt = f"How many {session['option_type']} options should be bought to fully hedge {session['num_shares']} shares with a total premium cost of approximately ${total_cost:.2f}, show the premium per share, show the calculation process? Don't include the formulas like you write them on ChatGPT but make it easy for the API product to understand. Additionally, don't put things in bold."
-                option_quantity_suggestion = send_data_to_chatgpt(additional_prompt, context=session['history'])
-
-                session['history'].append({"role": "assistant", "content": option_quantity_suggestion})
-                session['step'] = 8
-                response = f"{option_quantity_suggestion}\n\nThe estimated total cost to hedge with {session['option_type']} options is approximately ${total_cost:.2f}. Do you wish to proceed with this strategy? (Yes/No, or I have questions)"
             except ValueError:
-                response = "Please enter a valid numeric value for the strike price."
+                return jsonify({"message": "Please enter a valid numeric value for the strike price."})
+
+            session['option_type'] = 'put' if session['sentiment'] == 'bearish' else 'call'
+
+            symbol = session['symbol']
+            expiration_date = session['expiration_date']
+            strike_price = session['strike_price']
+            call_premium, put_premium = get_option_premium(symbol, expiration_date, strike_price)
+            session['call_premium'] = call_premium
+            session['put_premium'] = put_premium
+            total_cost = (call_premium or 0) * session['num_shares'] + (put_premium or 0) * session['num_shares']
+            additional_prompt = f"How many {session['option_type']} options should be bought to fully hedge {session['num_shares']} shares with a total premium cost of approximately ${total_cost:.2f}, show the premium per share, show the calculation process? Don't include the formulas like you write them on ChatGPT but make it easy for the API product to understand. Additionally, don't put things in bold."
+            option_quantity_suggestion = send_data_to_chatgpt(additional_prompt, context=session['history'])
+
+            session['history'].append({"role": "assistant", "content": option_quantity_suggestion})
+            session['step'] = 8
+            response = f"{option_quantity_suggestion}\n\nThe estimated total cost to hedge with {session['option_type']} options is approximately ${total_cost:.2f}. Do you wish to proceed with this strategy? (Yes/No, or I have questions)"
         elif step == 8:
             if user_response.lower() == 'yes':
                 brokers = """
