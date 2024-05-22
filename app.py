@@ -8,43 +8,6 @@ from utils import get_option_chain_dates_within_range, get_current_stock_price, 
 
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
-from flask import Flask, request, jsonify, session
-import yfinance as yf
-
-app = Flask(__name__)
-app.secret_key = 'your_secret_key'
-
-@app.route('/start', methods=['POST'])
-def start():
-    session['history'] = []
-    return jsonify({"response": "Welcome! Let's start with the basics. What is the stock symbol of the stock you want to hedge?"})
-
-@app.route('/next', methods=['POST'])
-def next_step():
-    user_input = request.json.get('input')
-    step = len(session['history'])
-
-    if step == 0:
-        session['history'].append({'step': 0, 'input': user_input})
-        ticker = yf.Ticker(user_input)
-        try:
-            ticker.history(period="1d")
-            session['ticker'] = user_input
-            return jsonify({"response": "Great! How many shares do you own?"})
-        except:
-            return jsonify({"response": "The stock symbol is invalid. Please enter a valid stock symbol."})
-    elif step == 1:
-        try:
-            shares = int(user_input)
-            session['history'].append({'step': 1, 'input': user_input})
-            return jsonify({"response": f"Great! You own {shares} shares. What do you want to do next?"})
-        except ValueError:
-            return jsonify({"response": "Please enter a valid number of shares."})
-    else:
-        return jsonify({"response": "I'm sorry, I didn't understand that. Can you please repeat?"})
-
-if __name__ == '__main__':
-    app.run(debug=True)
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "https://kais-trendy-site-0e1711.webflow.io"}})
