@@ -37,10 +37,12 @@ def next_step():
         user_response = data['message']
         step = session.get('step', 1)
 
+        # Ensure session history is initialized
         if 'history' not in session:
             session['history'] = []
 
         session['history'].append({"role": "user", "content": user_response})
+        logging.debug(f"Step: {step}, User Response: {user_response}")
 
         if step == 1:
             session['symbol'] = user_response.upper()
@@ -48,9 +50,12 @@ def next_step():
             session['step'] = 2
             response = "Great! How many shares do you own?"
         elif step == 2:
-            session['num_shares'] = int(user_response)
-            session['step'] = 3
-            response = "Understood. What is the maximum amount you are willing to lose (in dollars)?"
+            try:
+                session['num_shares'] = int(user_response)
+                session['step'] = 3
+                response = "Understood. What is the maximum amount you are willing to lose (in dollars)?"
+            except ValueError:
+                response = "Please enter a valid number of shares."
         elif step == 3:
             session['loss_aversion'] = float(user_response)
             session['step'] = 4
