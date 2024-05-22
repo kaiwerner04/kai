@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 def get_option_chain_dates_within_range(symbol, target_date, weeks_range=2):
     try:
-        ticker = yf.Ticker(symbol)
+        ticker = yf.TTicker(symbol)
         available_dates = ticker.options
         if not available_dates:
             print("No available expiration dates found.")
@@ -26,7 +26,11 @@ def get_option_chain_dates_within_range(symbol, target_date, weeks_range=2):
 def get_current_stock_price(symbol):
     try:
         ticker = yf.Ticker(symbol)
-        price = ticker.history(period="1d")['Close'].iloc[-1]
+        price_data = ticker.history(period="1d")
+        if price_data.empty:
+            print(f"No price data found for symbol: {symbol}")
+            return None
+        price = price_data['Close'].iloc[-1]
         return price
     except Exception as e:
         print(f"Failed to fetch current stock price: {str(e)}")
@@ -43,4 +47,3 @@ def get_option_premium(symbol, expiration_date, strike_price):
     except Exception as e:
         print(f"Failed to fetch option premium: {str(e)}")
         return None, None
-
