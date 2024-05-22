@@ -1,13 +1,12 @@
 import yfinance as yf
 from datetime import datetime, timedelta
-import logging
 
 def get_option_chain_dates_within_range(symbol, target_date, weeks_range=2):
     try:
-        ticker = yf.TTicker(symbol)
+        ticker = yf.Ticker(symbol)
         available_dates = ticker.options
         if not available_dates:
-            logging.error("No available expiration dates found for symbol: %s", symbol)
+            print("No available expiration dates found.")
             return []
 
         target_date = datetime.strptime(target_date, "%Y-%m-%d")
@@ -21,22 +20,22 @@ def get_option_chain_dates_within_range(symbol, target_date, weeks_range=2):
 
         return filtered_dates
     except Exception as e:
-        logging.error(f"Failed to fetch or filter option chain dates for {symbol}: {str(e)}")
+        print(f"Failed to fetch or filter option chain dates: {str(e)}")
         return []
 
 def get_current_stock_price(symbol):
     try:
-        logging.debug(f"Fetching current stock price for symbol: {symbol}")
         ticker = yf.Ticker(symbol)
-        history = ticker.history(period="1d")
-        if history.empty:
-            logging.error(f"No historical data found for symbol: {symbol}")
+        # Fetch the quote summary to check for valid stock symbol and get the price
+        quote_summary = ticker.history(period="1d")
+        if 'Close' in quote_summary:
+            price = quote_summary['Close'].iloc[-1]
+            return price
+        else:
+            print(f"Error: 'Close' data not found for symbol: {symbol}")
             return None
-        price = history['Close'].iloc[-1]
-        logging.debug(f"Current stock price for {symbol} is {price}")
-        return price
     except Exception as e:
-        logging.error(f"Failed to fetch current stock price for {symbol}: {str(e)}")
+        print(f"Failed to fetch current stock price: {str(e)}")
         return None
 
 def get_option_premium(symbol, expiration_date, strike_price):
@@ -48,5 +47,5 @@ def get_option_premium(symbol, expiration_date, strike_price):
         put_premium = put_data.iloc[0]['lastPrice'] if not put_data.empty else None
         return call_premium, put_premium
     except Exception as e:
-        logging.error(f"Failed to fetch option premium for {symbol} at {strike_price} expiring on {expiration_date}: {str(e)}")
+        print(f"Failed to fetch option premium: {str(e)}")
         return None, None
