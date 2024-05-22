@@ -5,7 +5,6 @@ from flask_cors import CORS
 import logging
 from datetime import datetime, timedelta
 from utils import get_option_chain_dates_within_range, get_current_stock_price, get_option_premium
-import yfinance as yf
 
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
@@ -31,15 +30,6 @@ def start():
         logging.error(f"Error in /start: {e}")
         return jsonify({"message": f"Error: {e}"}), 500
 
-def is_valid_stock_symbol(symbol):
-    try:
-        stock = yf.Ticker(symbol)
-        stock_info = stock.info
-        return stock_info['regularMarketPrice'] is not None
-    except Exception as e:
-        logging.error(f"Error validating stock symbol: {symbol}, Error: {e}")
-        return False
-
 @app.route('/next', methods=['POST'])
 def next_step():
     try:
@@ -56,60 +46,37 @@ def next_step():
 
         if step == 1:
             session['symbol'] = user_response.upper()
-            if is_valid_stock_symbol(session['symbol']):
-                session['current_price'] = get_current_stock_price(session['symbol'])
-                if session['current_price'] is not None:
-                    session['step'] = 2
-                    response = "Great! How many shares do you own?"
-                else:
-                    response = "Failed to fetch the current stock price. Please enter a valid stock symbol."
-                logging.debug(f"Valid stock symbol received: {session['symbol']}")
-            else:
-                logging.error(f"Invalid stock symbol: {session['symbol']}")
+            session['current_price'] = get_current_stock_price(session['symbol'])
+            if session['current_price'] is None:
                 response = "The stock symbol is invalid or the stock may be delisted. Please enter a valid stock symbol."
+                logging.debug(f"Invalid stock symbol: {session['symbol']}")
+            else:
+                session['step'] = 2
+                response = "Great! How many shares do you own?"
         elif step == 2:
-            try:
-                session['num_shares'] = int(user_response)
-                session['step'] = 3
-                response = "Understood. What is the maximum amount you are willing to lose (in dollars)?"
-                logging.debug(f"Number of shares received: {session['num_shares']}")
-            except ValueError:
-                logging.error(f"Invalid number of shares: {user_response}")
-                response = "Please enter a valid number of shares."
+            session['num_shares'] = int(user_response)
+            session['step'] = 3
+            response = "Understood. What is the maximum amount you are willing to lose (in dollars)?"
         elif step == 3:
-            try:
-                session['loss_aversion'] = float(user_response)
-                session['step'] = 4
-                response = "Got it. For how many weeks would you like this hedge to be effective?"
-                logging.debug(f"Loss aversion amount received: {session['loss_aversion']}")
-            except ValueError:
-                logging.error(f"Invalid loss aversion amount: {user_response}")
-                response = "Please enter a valid amount."
+            session['loss_aversion'] = float(user_response)
+            session['step'] = 4
+            response = "Got it. For how many weeks would you like this hedge to be effective?"
         elif step == 4:
-            try:
-                session['hedge_duration'] = int(user_response)
-                symbol = session['symbol']
-                target_date = (datetime.now() + timedelta(weeks=session['hedge_duration'])).strftime("%Y-%m-%d")
-                expiration_dates = get_option_chain_dates_within_range(symbol, target_date, weeks_range=2)
-                if expiration_dates:
-                    session['expiration_dates'] = expiration_dates
-                    session['step'] = 5
-                    response = {
-                        "message": "Here are some expiration dates close to your desired hedge duration. Please choose one of the following dates:",
-                        "dates": expiration_dates
-                    }
-                    logging.debug(f"Hedge duration received: {session['hedge_duration']} weeks")
-                    return jsonify(response)
-                else:
-                    response = "No available expiration dates found. Please try again with a different hedge duration."
-            except ValueError:
-                logging.error(f"Invalid hedge duration: {user_response}")
-                response = "Please enter a valid number of weeks."
+            session['hedge_duration'] = int(user_response)
+            symbol = session['symbol']
+            target_date = (datetime.now() + timedelta(weeks=session['hedge_duration'])).strftime("%Y-%m-%d")
+            expiration_dates = get_option_chain_dates_within_range(symbol, target_date, weeks_range=2)
+            session['expiration_dates'] = expiration_dates
+            session['step'] = 5
+            response = {
+                "message": "Here are some expiration dates close to your desired hedge duration. Please choose one of the following dates:",
+                "dates": expiration_dates
+            }
+            return jsonify(response)
         elif step == 5:
             session['expiration_date'] = user_response
             session['step'] = 6
             response = "Please explain your reason for wanting to hedge and whether you are bullish or bearish."
-            logging.debug(f"Expiration date chosen: {session['expiration_date']}")
         elif step == 6:
             session['hedging_reason'] = user_response
             sentiment = "bullish" if "bullish" in user_response.lower() else "bearish"
@@ -129,29 +96,28 @@ def next_step():
             session['history'].append({"role": "assistant", "content": strike_price_suggestion})
             session['step'] = 7
             response = f"Based on your sentiment and current news, here is the suggested strike price information: {strike_price_suggestion}. What strike price would you like to use?"
-            logging.debug(f"Hedging reason and sentiment received: {session['hedging_reason']}, {session['sentiment']}")
         elif step == 7:
             try:
                 session['strike_price'] = float(user_response)
-                session['option_type'] = 'put' if session['sentiment'] == 'bearish' else 'call'
-
-                symbol = session['symbol']
-                expiration_date = session['expiration_date']
-                strike_price = session['strike_price']
-                call_premium, put_premium = get_option_premium(symbol, expiration_date, strike_price)
-                session['call_premium'] = call_premium
-                session['put_premium'] = put_premium
-                total_cost = (call_premium or 0) * session['num_shares'] + (put_premium or 0) * session['num_shares']
-                additional_prompt = f"How many {session['option_type']} options should be bought to fully hedge {session['num_shares']} shares with a total premium cost of approximately ${total_cost:.2f}, show the premium per share, show the calculation process? Don't include the formulas like you write them on ChatGPT but make it easy for the API product to understand. Additionally, don't put things in bold."
-                option_quantity_suggestion = send_data_to_chatgpt(additional_prompt, context=session['history'])
-
-                session['history'].append({"role": "assistant", "content": option_quantity_suggestion})
-                session['step'] = 8
-                response = f"{option_quantity_suggestion}\n\nThe estimated total cost to hedge with {session['option_type']} options is approximately ${total_cost:.2f}. Do you wish to proceed with this strategy? (Yes/No, or I have questions)"
-                logging.debug(f"Strike price received: {session['strike_price']}, Option premiums: {call_premium}, {put_premium}, Total cost: {total_cost}")
             except ValueError:
-                logging.error(f"Invalid strike price: {user_response}")
-                response = "Please enter a valid numeric value for the strike price."
+                return jsonify({"message": "Please enter a valid numeric value for the strike price."})
+
+            session['option_type'] = 'put' if session['sentiment'] == 'bearish' else 'call'
+
+            symbol = session['symbol']
+            expiration_date = session['expiration_date']
+            strike_price = session['strike_price']
+            call_premium, put_premium = get_option_premium(symbol, expiration_date, strike_price)
+            session['call_premium'] = call_premium
+            session['put_premium'] = put_premium
+            total_cost = (call_premium or 0) * session['num_shares'] + (put_premium or 0) * session['num_shares']
+            additional_prompt = f"How many {session['option_type']} options should be bought to fully hedge {session['num_shares']} shares with a total premium cost of approximately ${total_cost:.2f}, show the premium per share, show the calculation process? Don't include the formulas like you write them on ChatGPT but make it easy for the API product to understand. Additionally, don't put things in bold."
+            option_quantity_suggestion = send_data_to_chatgpt(additional_prompt, context=session['history'])
+
+            session['history'].append({"role": "assistant", "content": option_quantity_suggestion})
+            session['step'] = 8
+            response = f"{option_quantity_suggestion}\n\nThe estimated total cost to hedge with {session['option_type']} options is approximately ${total_cost:.2f}. Do you wish to proceed with this strategy? (Yes/No, or I have questions)"
+            logging.debug(f"Strike price received: {session['strike_price']}, Option premiums: {call_premium}, {put_premium}, Total cost: {total_cost}")
         elif step == 8:
             if user_response.lower() == 'yes':
                 brokers = """
@@ -161,15 +127,12 @@ def next_step():
                 - <a href="https://www.interactivebrokers.com/en/home.php">Interactive Brokers</a>
                 """
                 response = f"{brokers} Do you need further assistance?"
-                logging.debug("User chose to proceed with the strategy.")
             elif user_response.lower() == 'no':
                 session['step'] = 9
                 response = "Please explain your questions or concerns."
-                logging.debug("User chose not to proceed with the strategy.")
             else:
                 session['step'] = 9
                 response = "Please explain your questions or concerns."
-                logging.debug("User has questions or concerns.")
         elif step == 9:
             prompt = (
                 f"User has the following questions or concerns: {user_response}\n"
@@ -180,7 +143,6 @@ def next_step():
             session['history'].append({"role": "assistant", "content": response})
             session['step'] = 8
             response = f"{response}\n\nDo you now understand and wish to proceed with the strategy? (Yes/No, or I have questions)"
-            logging.debug("Responded to user's questions or concerns.")
 
         session['history'].append({"role": "assistant", "content": response})
         logging.debug(f"Step {step} processed successfully with response: {response}")
