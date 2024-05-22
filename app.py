@@ -36,6 +36,10 @@ def next_step():
         data = request.get_json()
         user_response = data['message']
         step = session.get('step', 1)
+
+        if 'history' not in session:
+            session['history'] = []
+
         session['history'].append({"role": "user", "content": user_response})
 
         if step == 1:
@@ -160,4 +164,3 @@ def send_data_to_chatgpt(prompt, context):
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
-
