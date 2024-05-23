@@ -1,6 +1,18 @@
 import yfinance as yf
 from datetime import datetime, timedelta
 
+
+import yfinance as yf
+
+def get_stock_info(ticker_symbol):
+    try:
+        ticker = yf.Ticker(ticker_symbol)
+        info = ticker.info
+        return info
+    except Exception as e:
+        print(f"Error fetching stock data: {e}")
+        return None
+
 def get_option_chain_dates_within_range(symbol, target_date, weeks_range=2):
     try:
         ticker = yf.Ticker(symbol)
