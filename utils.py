@@ -1,9 +1,8 @@
 import yfinance as yf
-from datetime import datetime, timedelta
 
 def get_option_chain_dates_within_range(symbol, target_date, weeks_range=2):
     try:
-        ticker = yf.TTicker(symbol)
+        ticker = yf.Ticker(symbol)
         available_dates = ticker.options
         if not available_dates:
             print("No available expiration dates found.")
@@ -26,13 +25,11 @@ def get_option_chain_dates_within_range(symbol, target_date, weeks_range=2):
 def get_current_stock_price(symbol):
     try:
         ticker = yf.Ticker(symbol)
-        info = ticker.info
-        print(f"Info for {symbol}: {info}")  # Debugging line
-        if 'regularMarketPrice' not in info or info['regularMarketPrice'] is None:
+        ticker_info = ticker.info
+        if 'regularMarketPrice' not in ticker_info or ticker_info['regularMarketPrice'] is None:
             print(f"Invalid stock symbol: {symbol}")
             return None
-
-        price = ticker.history(period="1d")['Close'].iloc[-1]
+        price = ticker_info['regularMarketPrice']
         return price
     except Exception as e:
         print(f"Failed to fetch current stock price: {str(e)}")
@@ -49,3 +46,22 @@ def get_option_premium(symbol, expiration_date, strike_price):
     except Exception as e:
         print(f"Failed to fetch option premium: {str(e)}")
         return None, None
+
+def validate_stock_symbol(symbol):
+    try:
+        ticker = yf.Ticker(symbol)
+        ticker_info = ticker.info
+        if 'regularMarketPrice' in ticker_info and ticker_info['regularMarketPrice'] is not None:
+            print(f"Valid stock symbol: {symbol}")
+            return True
+        else:
+            print(f"Invalid stock symbol: {symbol}")
+            return False
+    except Exception as e:
+        print(f"Error validating stock symbol: {symbol}, Error: {str(e)}")
+        return False
+
+# Test the validation function
+symbols = ["META", "AAPL", "GOOG"]
+for symbol in symbols:
+    validate_stock_symbol(symbol)
