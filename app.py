@@ -37,7 +37,6 @@ def next_step():
         user_response = data['message']
         step = session.get('step', 1)
 
-        # Ensure session history is initialized
         if 'history' not in session:
             session['history'] = []
 
