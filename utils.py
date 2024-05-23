@@ -46,7 +46,7 @@ def get_option_premium(symbol, expiration_date, strike_price):
 
 def validate_stock_symbol(symbol):
     """
-    Validates a given stock symbol by checking if it has a regular market price.
+    Validates a given stock symbol by checking if it has a valid market price.
 
     Args:
         symbol (str): The ticker symbol of the stock.
@@ -61,10 +61,14 @@ def validate_stock_symbol(symbol):
 
         if 'regularMarketPrice' in ticker_info and ticker_info['regularMarketPrice'] is not None:
             price = ticker_info['regularMarketPrice']
+        else:
+            price = ticker.history(period="1d")['Close'].iloc[-1]
+
+        if price is not None:
             print(f"Valid stock symbol: {symbol}, Current Price: {price}")
             return True
         else:
-            print(f"Stock symbol {symbol} has no current price data or 'regularMarketPrice' key is missing.")
+            print(f"Stock symbol {symbol} has no current price data.")
             return False
     except Exception as e:
         print(f"Error validating stock symbol {symbol}: {str(e)}")
