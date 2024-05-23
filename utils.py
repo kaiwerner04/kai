@@ -26,14 +26,14 @@ def get_option_chain_dates_within_range(symbol, target_date, weeks_range=2):
 def get_current_stock_price(symbol):
     try:
         ticker = yf.Ticker(symbol)
-        # Fetch the quote summary to check for valid stock symbol and get the price
-        quote_summary = ticker.history(period="1d")
-        if 'Close' in quote_summary:
-            price = quote_summary['Close'].iloc[-1]
-            return price
-        else:
-            print(f"Error: 'Close' data not found for symbol: {symbol}")
+        # Check if the stock exists by getting its info
+        info = ticker.info
+        if 'regularMarketPrice' not in info or info['regularMarketPrice'] is None:
+            print(f"Invalid stock symbol: {symbol}")
             return None
+
+        price = ticker.history(period="1d")['Close'].iloc[-1]
+        return price
     except Exception as e:
         print(f"Failed to fetch current stock price: {str(e)}")
         return None
