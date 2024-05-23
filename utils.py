@@ -99,6 +99,7 @@ def get_option_premium(symbol, expiration_date, strike_price):
         print(f"Failed to fetch option premium for {symbol} on {expiration_date} at strike {strike_price}: {str(e)}")
         return None, None
 
+
 def validate_stock_symbol(symbol):
     """
     Validates a given stock symbol by checking if it has a regular market price.
@@ -113,17 +114,21 @@ def validate_stock_symbol(symbol):
         ticker = yf.Ticker(symbol)
         ticker_info = ticker.info
         print(f"Ticker info for validation: {ticker_info}")
+
+        # Check for the 'regularMarketPrice' in the ticker info
         if 'regularMarketPrice' in ticker_info and ticker_info['regularMarketPrice'] is not None:
             print(f"Valid stock symbol: {symbol}")
             return True
         else:
-            print(f"Invalid stock symbol: {symbol}")
+            print(f"Invalid stock symbol or missing price data for {symbol}.")
             return False
     except Exception as e:
         print(f"Error validating stock symbol {symbol}: {str(e)}")
         return False
 
+
 # Test the validation function
 symbols = ["META", "AAPL", "GOOG"]
 for symbol in symbols:
     validate_stock_symbol(symbol)
+
