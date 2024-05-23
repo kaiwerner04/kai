@@ -14,6 +14,7 @@ def get_stock_info(ticker_symbol):
     try:
         ticker = yf.Ticker(ticker_symbol)
         info = ticker.info
+        print(f"Fetched info for {ticker_symbol}: {info}")
         return info
     except Exception as e:
         print(f"Error fetching stock data for {ticker_symbol}: {e}")
@@ -65,6 +66,7 @@ def get_current_stock_price(symbol):
     try:
         ticker = yf.Ticker(symbol)
         ticker_info = ticker.info
+        print(f"Ticker info for {symbol}: {ticker_info}")
         if 'regularMarketPrice' not in ticker_info or ticker_info['regularMarketPrice'] is None:
             print(f"Invalid stock symbol or missing price data for {symbol}.")
             return None
@@ -110,6 +112,7 @@ def validate_stock_symbol(symbol):
     try:
         ticker = yf.Ticker(symbol)
         ticker_info = ticker.info
+        print(f"Ticker info for validation: {ticker_info}")
         if 'regularMarketPrice' in ticker_info and ticker_info['regularMarketPrice'] is not None:
             print(f"Valid stock symbol: {symbol}")
             return True
