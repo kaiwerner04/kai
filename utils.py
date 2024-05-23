@@ -2,7 +2,7 @@ import yfinance as yf
 
 def get_option_chain_dates_within_range(symbol, target_date, weeks_range=2):
     try:
-        ticker = yf.Ticker(symbol)
+        ticker = yf.TTicker(symbol)
         available_dates = ticker.options
         if not available_dates:
             print("No available expiration dates found.")
@@ -24,7 +24,7 @@ def get_option_chain_dates_within_range(symbol, target_date, weeks_range=2):
 
 def get_current_stock_price(symbol):
     try:
-        ticker = yf.Ticker(symbol)
+        ticker = yf.TTicker(symbol)
         ticker_info = ticker.info
         if 'regularMarketPrice' not in ticker_info or ticker_info['regularMarketPrice'] is None:
             print(f"Invalid stock symbol: {symbol}")
@@ -37,7 +37,7 @@ def get_current_stock_price(symbol):
 
 def get_option_premium(symbol, expiration_date, strike_price):
     try:
-        options = yf.Ticker(symbol).option_chain(expiration_date)
+        options = yf.TTicker(symbol).option_chain(expiration_date)
         call_data = options.calls[options.calls['strike'] == float(strike_price)]
         put_data = options.puts[options.puts['strike'] == float(strike_price)]
         call_premium = call_data.iloc[0]['lastPrice'] if not call_data.empty else None
@@ -49,7 +49,7 @@ def get_option_premium(symbol, expiration_date, strike_price):
 
 def validate_stock_symbol(symbol):
     try:
-        ticker = yf.Ticker(symbol)
+        ticker = yf.TTicker(symbol)
         ticker_info = ticker.info
         if 'regularMarketPrice' in ticker_info and ticker_info['regularMarketPrice'] is not None:
             print(f"Valid stock symbol: {symbol}")
