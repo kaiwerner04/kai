@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 def get_option_chain_dates_within_range(symbol, target_date, weeks_range=2):
     try:
-        ticker = yf.Ticker(symbol)
+        ticker = yf.TTicker(symbol)
         available_dates = ticker.options
         if not available_dates:
             print("No available expiration dates found.")
@@ -26,8 +26,8 @@ def get_option_chain_dates_within_range(symbol, target_date, weeks_range=2):
 def get_current_stock_price(symbol):
     try:
         ticker = yf.Ticker(symbol)
-        # Check if the stock exists by getting its info
         info = ticker.info
+        print(f"Info for {symbol}: {info}")  # Debugging line
         if 'regularMarketPrice' not in info or info['regularMarketPrice'] is None:
             print(f"Invalid stock symbol: {symbol}")
             return None
